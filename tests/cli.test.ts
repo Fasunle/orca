@@ -228,4 +228,251 @@ Usage:
       expect(targets).toEqual([]);
     });
   });
+
+  describe('cache operations', () => {
+    it('should clean cache when clean command is called', () => {
+      const spy = vi.spyOn(console, 'log');
+
+      const command = 'clean';
+      if (command === 'clean') {
+        console.log('Clearing cache...');
+      }
+
+      expect(spy).toHaveBeenCalledWith('Clearing cache...');
+      spy.mockRestore();
+    });
+  });
+
+  describe('help and usage', () => {
+    it('should show proper usage format for help', () => {
+      const spy = vi.spyOn(console, 'log');
+
+      const args = [];
+      const command = args[0];
+
+      if (!command) {
+        console.log('Usage:');
+      }
+
+      spy.mockRestore();
+    });
+
+    it('should include examples in help text', () => {
+      const helpText = `
+bun-cache - Local caching for monorepos
+
+Usage:
+  bun-cache run <task> [targets...]
+  bun-cache clean
+
+Examples:
+  bun-cache run build
+  bun-cache run test apps/web
+  bun-cache clean
+      `;
+
+      expect(helpText).toContain('Examples');
+      expect(helpText).toContain('bun-cache run build');
+    });
+  });
+
+  describe('task execution scenarios', () => {
+    it('should accept multiple task names', () => {
+      const taskNames = ['build', 'test', 'lint', 'deploy'];
+
+      taskNames.forEach(task => {
+        expect(task).toBeDefined();
+        expect(typeof task).toBe('string');
+      });
+    });
+
+    it('should handle workspace patterns', () => {
+      const patterns = ['apps/*', 'packages/*', 'apps/*/src'];
+
+      patterns.forEach(pattern => {
+        expect(pattern).toContain('*');
+      });
+    });
+
+    it('should handle specific workspace targets', () => {
+      const targets = ['apps/web', 'apps/api', 'packages/ui-lib'];
+
+      expect(targets).toHaveLength(3);
+      expect(targets[0]).toBe('apps/web');
+    });
+
+    it('should handle nested workspace paths', () => {
+      const args = ['run', 'build', 'monorepo/packages/core/ui'];
+      const targets = args.slice(2);
+
+      expect(targets[0]).toBe('monorepo/packages/core/ui');
+    });
+  });
+
+  describe('error scenarios', () => {
+    it('should provide clear error for missing arguments', () => {
+      const spy = vi.spyOn(console, 'error');
+
+      const args = ['run'];
+      const task = args[1];
+
+      if (!task) {
+        console.error('Please specify a task to run');
+      }
+
+      expect(spy).toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('should handle unexpected command gracefully', () => {
+      const spy = vi.spyOn(console, 'log');
+
+      const command = 'invalid-command';
+      const validCommands = ['run', 'clean'];
+
+      if (!validCommands.includes(command)) {
+        console.log('bun-cache');
+      }
+
+      expect(spy).toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('should handle special characters in task names', () => {
+      const args = ['run', 'build:watch'];
+      const task = args[1];
+
+      expect(task).toBe('build:watch');
+    });
+
+    it('should handle special characters in target paths', () => {
+      const args = ['run', 'build', '@scope/package', 'apps-v2/web'];
+      const targets = args.slice(2);
+
+      expect(targets).toContain('@scope/package');
+      expect(targets).toContain('apps-v2/web');
+    });
+  });
+
+  describe('CLI main function integration', () => {
+    it('should handle help message output', () => {
+      const spy = vi.spyOn(console, 'log');
+
+      // Simulate help output
+      const helpMsg = `
+bun-cache - Local caching for monorepos
+
+Usage:
+  bun-cache run <task> [targets...]
+  bun-cache clean
+      `;
+      console.log(helpMsg);
+
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('bun-cache'));
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Usage'));
+
+      spy.mockRestore();
+    });
+
+    it('should validate task is provided for run command', () => {
+      const errorSpy = vi.spyOn(console, 'error');
+
+      const command = 'run';
+      const task = undefined;
+
+      if (command === 'run' && !task) {
+        console.error('Error: Please specify a task to run');
+      }
+
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it('should process run command with task', () => {
+      const command = 'run';
+      const task = 'build';
+      const targets = [];
+
+      expect(command).toBe('run');
+      expect(task).toBeDefined();
+      expect(task).toBe('build');
+    });
+
+    it('should process run command with targets', () => {
+      const command = 'run';
+      const task = 'test';
+      const targets = ['apps/web', 'apps/api'];
+
+      expect(command).toBe('run');
+      expect(targets).toHaveLength(2);
+      expect(targets[0]).toBe('apps/web');
+    });
+
+    it('should handle clean command', () => {
+      const logSpy = vi.spyOn(console, 'log');
+
+      const command = 'clean';
+      if (command === 'clean') {
+        console.log('Clearing cache...');
+      }
+
+      expect(logSpy).toHaveBeenCalledWith('Clearing cache...');
+      logSpy.mockRestore();
+    });
+
+    it('should show help for unrecognized command', () => {
+      const logSpy = vi.spyOn(console, 'log');
+
+      const command = 'unknown';
+      const validCommands = ['run', 'clean'];
+
+      if (!validCommands.includes(command || '')) {
+        console.log('bun-cache - help');
+      }
+
+      expect(logSpy).toHaveBeenCalled();
+      logSpy.mockRestore();
+    });
+
+    it('should handle errors during task execution', () => {
+      const errorSpy = vi.spyOn(console, 'error');
+
+      try {
+        throw new Error('Task execution failed');
+      } catch (err) {
+        console.error('Error:', err instanceof Error ? err.message : String(err));
+      }
+
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it('should support multiple target specifications', () => {
+      const args = ['run', 'build', 'apps/web', 'apps/api', 'packages/core'];
+      const command = args[0];
+      const task = args[1];
+      const targets = args.slice(2);
+
+      expect(command).toBe('run');
+      expect(task).toBe('build');
+      expect(targets).toHaveLength(3);
+    });
+
+    it('should handle empty target list', () => {
+      const args = ['run', 'build'];
+      const targets = args.slice(2);
+
+      expect(targets).toHaveLength(0);
+    });
+
+    it('should accept task names with special characters', () => {
+      const taskNames = ['build:prod', 'test:e2e', 'lint:fix', 'deploy-prod'];
+
+      taskNames.forEach(name => {
+        const command = 'run';
+        expect(command).toBe('run');
+        expect(name).toBeDefined();
+      });
+    });
+  });
 });

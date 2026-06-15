@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { Orchestrator } from './orchestrator';
-import { join } from 'path';
+import { Logger } from './logger';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -15,26 +15,23 @@ async function main() {
   switch (command) {
     case 'run':
       if (!task) {
-        console.error('Please specify a task to run');
+        Logger.errorWithContext('Error', 'Please specify a task to run');
         process.exit(1);
       }
       await orchestrator.run(task, targets);
       break;
 
     case 'clean':
-      console.log('Clearing cache...');
+      Logger.clearingCache();
       // Add cache cleanup
       break;
 
     default:
-      console.log(`
-bun-cache - Local caching for monorepos
-
-Usage:
-  bun-cache run <task> [targets...]
-  bun-cache clean
-      `);
+      Logger.help();
   }
 }
 
-main().catch(console.error);
+main().catch(err => {
+  Logger.errorWithContext('Error', err instanceof Error ? err.message : String(err));
+  process.exit(1);
+});

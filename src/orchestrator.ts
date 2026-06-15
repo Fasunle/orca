@@ -4,6 +4,7 @@ import { spawn } from 'child_process';
 import type { TurboConfig, PipelineTask } from './types';
 import { Hasher } from './hasher';
 import { CacheManager } from './cache';
+import { Logger } from './logger';
 
 interface TaskGraphNode {
   id: string; // "workspace:task"
@@ -26,6 +27,10 @@ export class Orchestrator {
   private workspaces: string[];
   private rootDir: string;
   private taskGraph: Map<string, TaskGraphNode> = new Map();
+  private executedTasks = 0;
+  private totalTasks = 0;
+  private currentLayer = 0;
+  private totalLayers = 0;
 
   constructor(rootDir: string) {
     this.rootDir = rootDir;
@@ -49,7 +54,7 @@ export class Orchestrator {
     if (targets && targets.length > 0) {
       for (const target of targets) {
         if (!workspaces.has(target)) {
-          console.warn(`⚠️  Target "${target}" not found in workspaces`);
+          Logger.targetNotFound(target);
         }
       }
       return targets.filter(t => workspaces.has(t));
@@ -110,7 +115,7 @@ export class Orchestrator {
 
     const taskConfig = this.config.pipeline[task];
     if (!taskConfig) {
-      throw new Error(`Task "${task}" not found in turbo.json`);
+      throw new Error(`Task "${task}" not defined in turbo.json`);
     }
 
     const node: TaskGraphNode = {
@@ -192,7 +197,9 @@ export class Orchestrator {
       }
 
       if (layer.length === 0 && visited.size < this.taskGraph.size) {
-        throw new Error('Circular dependency detected in task graph');
+        throw new Error(
+          'Circular dependency detected in task graph. Please review your dependencies configuration.'
+        );
       }
 
       if (layer.length > 0) {
@@ -215,11 +222,25 @@ export class Orchestrator {
    * Execute tasks according to the execution plan (layer by layer)
    */
   private async executeGraphLayers(plan: ExecutionPlan): Promise<void> {
+    this.totalTasks = plan.nodes.size;
+    this.totalLayers = plan.execution.length;
+    this.executedTasks = 0;
+
+    Logger.startExecution(this.totalTasks, this.totalLayers);
+
+    // If there are no tasks to execute, exit early
+    if (this.totalTasks === 0) return;
+
     for (const layer of plan.execution) {
+      this.currentLayer++;
+      Logger.layerHeader(this.currentLayer, this.totalLayers, layer.length);
+
       // Execute all tasks in a layer in parallel
       const promises = layer.map(nodeId => this.executeTaskNode(plan.nodes.get(nodeId)!));
       await Promise.all(promises);
     }
+
+    Logger.allTasksCompleted();
   }
 
   /**
@@ -227,6 +248,7 @@ export class Orchestrator {
    */
   private async executeTaskNode(node: TaskGraphNode): Promise<void> {
     const { workspace, task, config } = node;
+    const workspacePath = join(this.rootDir, workspace);
 
     const hash = this.hasher.generateTaskHash(
       workspace,
@@ -235,14 +257,16 @@ export class Orchestrator {
       this.config.globalDependencies
     );
 
-    // Check cache first
-    if (this.cache.get(hash)) {
-      console.log(`✓ Cache hit: ${workspace}:${task}`);
-      this.cache.restore(hash);
+    // Check cache only if explicitly enabled
+    if (config.cache === true && this.cache.get(hash)) {
+      this.executedTasks++;
+      Logger.cacheHit(this.executedTasks, this.totalTasks, workspace, task);
+      this.cache.restore(hash, workspacePath);
       return;
     }
 
-    console.log(`⚙️  Executing: ${workspace}:${task}`);
+    this.executedTasks++;
+    Logger.executing(this.executedTasks, this.totalTasks, workspace, task);
     const start = Date.now();
 
     try {
@@ -250,17 +274,15 @@ export class Orchestrator {
       await this.runCommand(workspace, command);
 
       const duration = Date.now() - start;
-      console.log(`✓ Completed: ${workspace}:${task} (${duration}ms)`);
+      Logger.completed(this.executedTasks, this.totalTasks, workspace, task, duration);
 
-      // Save to cache if caching is enabled for this task
-      if (config.cache !== false) {
-        this.cache.save(hash, config.outputs || []);
+      // Save to cache only if explicitly enabled
+      if (config.cache === true) {
+        this.cache.save(hash, config.outputs || [], workspacePath);
       }
     } catch (error) {
-      console.error(
-        `✗ Failed: ${workspace}:${task}`,
-        error instanceof Error ? error.message : String(error)
-      );
+      Logger.failed(this.executedTasks, this.totalTasks, workspace, task);
+      Logger.error(error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -290,14 +312,14 @@ export class Orchestrator {
   private getCommand(workspace: string, task: string): string {
     const pkgPath = join(this.rootDir, workspace, 'package.json');
     if (!existsSync(pkgPath)) {
-      throw new Error(`No package.json in ${workspace}`);
+      throw new Error(`No package.json found in workspace: ${workspace}`);
     }
 
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
     const script = pkg.scripts?.[task];
 
     if (!script) {
-      throw new Error(`No script "${task}" found in ${workspace}`);
+      throw new Error(`No script "${task}" found in ${workspace}/package.json`);
     }
 
     return script;

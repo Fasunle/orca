@@ -42,16 +42,16 @@ describe('CacheManager', () => {
     });
 
     it('should save cache metadata', () => {
-      const outputs = [join(testDir, 'dist', 'index.js')];
-      cacheManager.save('test-hash-123', outputs);
+      const outputs = ['dist/index.js'];
+      cacheManager.save('test-hash-123', outputs, testDir);
 
       const metaPath = join(testDir, 'node_modules', '.bun-cache', 'test-hash-123.json');
       expect(existsSync(metaPath)).toBe(true);
     });
 
     it('should store outputs in metadata', () => {
-      const outputs = [join(testDir, 'dist', 'index.js')];
-      cacheManager.save('hash-456', outputs);
+      const outputs = ['dist/index.js'];
+      cacheManager.save('hash-456', outputs, testDir);
 
       const metaPath = join(testDir, 'node_modules', '.bun-cache', 'hash-456.json');
       const meta = JSON.parse(require('fs').readFileSync(metaPath, 'utf-8'));
@@ -61,9 +61,9 @@ describe('CacheManager', () => {
     });
 
     it('should record timestamp on save', () => {
-      const outputs = [join(testDir, 'dist', 'index.js')];
+      const outputs = ['dist/index.js'];
       const before = Date.now();
-      cacheManager.save('hash-timestamp', outputs);
+      cacheManager.save('hash-timestamp', outputs, testDir);
       const after = Date.now();
 
       const metaPath = join(testDir, 'node_modules', '.bun-cache', 'hash-timestamp.json');
@@ -80,8 +80,8 @@ describe('CacheManager', () => {
       writeFileSync(join(dist, 'index.js'), '');
       writeFileSync(join(dist, 'style.css'), '');
 
-      const outputs = [join(dist, 'index.js'), join(dist, 'style.css')];
-      cacheManager.save('hash-multi', outputs);
+      const outputs = ['dist/index.js', 'dist/style.css'];
+      cacheManager.save('hash-multi', outputs, testDir);
 
       const metaPath = join(testDir, 'node_modules', '.bun-cache', 'hash-multi.json');
       const meta = JSON.parse(require('fs').readFileSync(metaPath, 'utf-8'));
@@ -91,7 +91,7 @@ describe('CacheManager', () => {
 
     it('should handle empty outputs array', () => {
       expect(() => {
-        cacheManager.save('hash-empty', []);
+        cacheManager.save('hash-empty', [], testDir);
       }).not.toThrow();
     });
   });
@@ -111,7 +111,7 @@ describe('CacheManager', () => {
       writeFileSync(outputFile, 'built');
 
       // Save cache with relative paths
-      cacheManager.save('valid-hash', ['dist/index.js']);
+      cacheManager.save('valid-hash', ['dist/index.js'], testDir);
 
       // Verify metadata was saved
       const metaPath = join(testDir, 'node_modules', '.bun-cache', 'valid-hash.json');
@@ -124,8 +124,8 @@ describe('CacheManager', () => {
       mkdirSync(outDir, { recursive: true });
       writeFileSync(join(outDir, 'index.js'), 'built');
 
-      const outputs = [join(outDir, 'index.js')];
-      cacheManager.save('missing-out-hash', outputs);
+      const outputs = ['dist/index.js'];
+      cacheManager.save('missing-out-hash', outputs, testDir);
 
       // Remove the output file
       rmSync(join(outDir, 'index.js'));
@@ -141,8 +141,8 @@ describe('CacheManager', () => {
       writeFileSync(join(outDir, 'index.js'), '');
       writeFileSync(join(outDir, 'style.css'), '');
 
-      const outputs = [join(outDir, 'index.js'), join(outDir, 'style.css')];
-      cacheManager.save('all-exist-hash', outputs);
+      const outputs = ['dist/index.js', 'dist/style.css'];
+      cacheManager.save('all-exist-hash', outputs, testDir);
 
       // Remove one file
       rmSync(join(outDir, 'style.css'));
@@ -158,7 +158,7 @@ describe('CacheManager', () => {
       writeFileSync(outputFile, 'code');
 
       // Save cache with relative paths
-      cacheManager.save('meta-hash', ['dist/bundle.js']);
+      cacheManager.save('meta-hash', ['dist/bundle.js'], testDir);
 
       // Verify metadata was saved and contains outputs
       const metaPath = join(testDir, 'node_modules', '.bun-cache', 'meta-hash.json');
@@ -181,12 +181,12 @@ describe('CacheManager', () => {
       mkdirSync(outDir, { recursive: true });
       writeFileSync(join(outDir, 'index.js'), 'built');
 
-      const outputs = [join(outDir, 'index.js')];
-      cacheManager.save('restore-hash', outputs);
+      const outputs = ['dist/index.js'];
+      cacheManager.save('restore-hash', outputs, testDir);
 
       // Just verify no error is thrown when restoring
       expect(() => {
-        cacheManager.restore('restore-hash');
+        cacheManager.restore('restore-hash', testDir);
       }).toBeDefined();
     });
   });
@@ -228,8 +228,8 @@ describe('CacheManager', () => {
       mkdirSync(outDir, { recursive: true });
       writeFileSync(join(outDir, 'index.js'), '');
 
-      const outputs = [join(outDir, 'index.js')];
-      cacheManager.save('json-hash', outputs);
+      const outputs = ['dist/index.js'];
+      cacheManager.save('json-hash', outputs, testDir);
 
       const metaPath = join(testDir, 'node_modules', '.bun-cache', 'json-hash.json');
 
@@ -243,7 +243,7 @@ describe('CacheManager', () => {
       mkdirSync(outDir, { recursive: true });
       writeFileSync(join(outDir, 'file.js'), 'content');
 
-      cacheManager.save('readable-hash', [join(outDir, 'file.js')]);
+      cacheManager.save('readable-hash', ['dist/file.js'], testDir);
 
       const metaPath = join(testDir, 'node_modules', '.bun-cache', 'readable-hash.json');
       const content = require('fs').readFileSync(metaPath, 'utf-8');
@@ -251,6 +251,104 @@ describe('CacheManager', () => {
 
       expect(meta).toHaveProperty('timestamp');
       expect(meta).toHaveProperty('outputs');
+    });
+  });
+
+  describe('directory operations', () => {
+    it('should handle caching directories', () => {
+      const outDir = join(testDir, 'dist');
+      mkdirSync(outDir, { recursive: true });
+      mkdirSync(join(outDir, 'lib'), { recursive: true });
+      writeFileSync(join(outDir, 'lib', 'index.js'), 'module.exports = {}');
+      writeFileSync(join(outDir, 'lib', 'utils.js'), 'module.exports = { util: true }');
+
+      const outputs = ['dist/lib'];
+      cacheManager.save('dir-hash', outputs, testDir);
+
+      const metaPath = join(testDir, 'node_modules', '.bun-cache', 'dir-hash.json');
+      expect(existsSync(metaPath)).toBe(true);
+    });
+
+    it('should restore directories with nested files', () => {
+      const outDir = join(testDir, 'dist');
+      mkdirSync(outDir, { recursive: true });
+      mkdirSync(join(outDir, 'nested', 'deep'), { recursive: true });
+      writeFileSync(join(outDir, 'nested', 'deep', 'file.js'), 'content');
+
+      const outputs = ['dist/nested'];
+      cacheManager.save('nested-hash', outputs, testDir);
+
+      // Remove original
+      rmSync(join(outDir, 'nested'), { recursive: true, force: true });
+      expect(existsSync(join(outDir, 'nested'))).toBe(false);
+
+      // Restore
+      cacheManager.restore('nested-hash', testDir);
+      expect(existsSync(join(outDir, 'nested', 'deep', 'file.js'))).toBe(true);
+    });
+
+    it('should handle mixed file and directory outputs', () => {
+      const outDir = join(testDir, 'dist');
+      mkdirSync(outDir, { recursive: true });
+      mkdirSync(join(outDir, 'assets'), { recursive: true });
+      writeFileSync(join(outDir, 'index.js'), 'app');
+      writeFileSync(join(outDir, 'assets', 'style.css'), 'css');
+
+      const outputs = ['dist/index.js', 'dist/assets'];
+      cacheManager.save('mixed-hash', outputs, testDir);
+
+      const metaPath = join(testDir, 'node_modules', '.bun-cache', 'mixed-hash.json');
+      const meta = JSON.parse(readFileSync(metaPath, 'utf-8'));
+      expect(meta.outputs).toEqual(outputs);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle corrupted metadata gracefully', () => {
+      const cacheDir = join(testDir, 'node_modules', '.bun-cache');
+      mkdirSync(cacheDir, { recursive: true });
+      writeFileSync(join(cacheDir, 'corrupt.json'), 'invalid json {');
+
+      const result = cacheManager.get('corrupt');
+      expect(result).toBe(false);
+    });
+
+    it('should handle metadata with missing outputs property', () => {
+      const cacheDir = join(testDir, 'node_modules', '.bun-cache');
+      mkdirSync(cacheDir, { recursive: true });
+      writeFileSync(join(cacheDir, 'bad-meta.json'), JSON.stringify({ timestamp: 123 }));
+
+      const result = cacheManager.get('bad-meta');
+      expect(result).toBe(false);
+    });
+
+    it('should handle non-array outputs in metadata', () => {
+      const cacheDir = join(testDir, 'node_modules', '.bun-cache');
+      mkdirSync(cacheDir, { recursive: true });
+      writeFileSync(join(cacheDir, 'wrong-type.json'), JSON.stringify({ outputs: 'not-array' }));
+
+      const result = cacheManager.get('wrong-type');
+      expect(result).toBe(false);
+    });
+
+    it('should handle restore with missing metadata', () => {
+      expect(() => {
+        cacheManager.restore('nonexistent-hash', testDir);
+      }).not.toThrow();
+    });
+
+    it('should handle restore with missing cached files', () => {
+      // Create metadata pointing to non-existent cached files
+      const cacheDir = join(testDir, 'node_modules', '.bun-cache');
+      mkdirSync(cacheDir, { recursive: true });
+      writeFileSync(
+        join(cacheDir, 'orphan.json'),
+        JSON.stringify({ timestamp: Date.now(), outputs: ['dist/index.js'] })
+      );
+
+      expect(() => {
+        cacheManager.restore('orphan', testDir);
+      }).not.toThrow();
     });
   });
 });
