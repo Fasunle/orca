@@ -1,0 +1,56 @@
+{
+  "name": "@fasunle/bun-cache",
+  "version": "0.1.0",
+  "description": "Local caching for monorepos using Bun - Turbo-inspired task orchestrator with zero-config caching",
+  "type": "module",
+  "main": "./dist/cli.js",
+  "exports": {
+    ".": "./dist/cli.js"
+  },
+  "bin": {
+    "bun-cache": "./dist/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fasunle/bun-cache.git"
+  },
+  "homepage": "https://github.com/fasunle/bun-cache#readme",
+  "bugs": {
+    "url": "https://github.com/fasunle/bun-cache/issues"
+  },
+  "keywords": [
+    "bun",
+    "monorepo",
+    "cache",
+    "turbo",
+    "performance",
+    "build-cache",
+    "task-orchestration"
+  ],
+  "author": "Kehinde Fasunle<kfasunle@gmail.com>",
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "scripts": {
+    "build": "bun build ./src/cli.ts --outdir ./dist --target node",
+    "dev": "bun run ./src/cli.ts",
+    "format": "prettier --write .",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:ui": "vitest --ui",
+    "prepublishOnly": "bun run build && bun run test:run",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
+    "publish-packages": "npm publish --access public"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@vitest/ui": "latest",
+    "bun-types": "latest",
+    "prettier": "^3.8.4",
+    "vitest": "latest"
+  }
+}

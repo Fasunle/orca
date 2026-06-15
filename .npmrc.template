@@ -1,0 +1,15 @@
+# NPM Registry Configuration Template
+# Copy this to your home directory and update with your npm token
+
+# Set the npm registry
+registry=https://registry.npmjs.org/
+
+# Add your npm token here (from https://www.npmjs.com/settings/~/tokens)
+# Create a new token and use the format below:
+# //registry.npmjs.org/:_authToken=YOUR_NPM_TOKEN_HERE
+
+# Enable strict SSL verification (recommended)
+strict-ssl=true
+
+# Set default access level for scoped packages
+@fasunle:registry=https://registry.npmjs.org/

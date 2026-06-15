@@ -1,0 +1,49 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version:
+          - 18.x
+          - 20.x
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run linter (if available)
+        run: bun run lint 2>/dev/null || true
+
+      - name: Run tests
+        run: bun run test:run
+
+      - name: Build package
+        run: bun run build
+
+      - name: Check build output
+        run: |
+          if [ ! -f "dist/cli.js" ]; then
+            echo "Build failed: dist/cli.js not found"
+            exit 1
+          fi
